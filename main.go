@@ -35,9 +35,12 @@ type Config struct {
 	Host     string `json:"host"`
 	Port     string `json:"port"`
 
-	AuthKeyBucket string `json:"bucket"`
+	AuthKeyBucket string `json:"authkeybucket"`
 	Authkey       string `json:"authkeypath"`
 
+	FileName                  string `json:"filename"`
+	FilePath                  string `json:"sourcefilepath"`
+	SourceFileBucket          string `json:"sourcebucketbucket"`
 	FileCopyDestinationFolder string `json:"filedestinationfolder"`
 }
 
@@ -89,9 +92,6 @@ func Handler(event interface{}) error {
 	if e == nil {
 		return fmt.Errorf("Unable to find payload")
 	}
-
-	payLoad := e["responsePayload"]
-	payLoadMap := payLoad.(map[string]interface{})
 
 	//create session
 	sess, err := session.NewSession(&aws.Config{
@@ -156,7 +156,7 @@ func Handler(event interface{}) error {
 	defer client.Close()
 
 	// create destination file
-	dstFile, err := client.Create(config.FileCopyDestinationFolder + payLoadMap["filename"].(string))
+	dstFile, err := client.Create(config.FileCopyDestinationFolder + config.FileName)
 	if err != nil {
 		log.Fatalf("error creating destination %v ", err)
 	}
@@ -164,8 +164,8 @@ func Handler(event interface{}) error {
 
 	// create source file
 	out, err := svc.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(payLoadMap["destinationbucket"].(string)),
-		Key:    aws.String(payLoadMap["filepath"].(string) + payLoadMap["filename"].(string)),
+		Bucket: aws.String(config.SourceFileBucket),
+		Key:    aws.String(config.FilePath + config.FileName),
 	})
 
 	if err != nil {
@@ -178,6 +178,10 @@ func Handler(event interface{}) error {
 	srcFile := buf
 
 	fmt.Println("read source file")
+
+	// // copy source file to destination file
+	// var buff []byte
+	// buff, err = json.Marshal(buf)
 
 	bytes, err := io.Copy(dstFile, srcFile)
 	if err != nil {
