@@ -9,3 +9,25 @@ AWS lambda function to copy a file from s3 to remote server
  - Set the configuration
 
  Handler function name: main
+
+
+# Configurations
+You have to provide the configuration as base64 encoded format. Add **CONFIG** in lambda configuration variable
+
+Use https://www.base64encode.org/ to encode the configurations
+
+```json
+{   	
+  "region" : "Region",
+	 "user" : "Remote server access user",
+	 "password" : "Remote server access password - ",
+	 "host" : "Remote host",
+	 "port" : "Remote access port",
+	 "pemkeybucket" : "Optional - If trying to access ssh with pem key : Pem key file stored bucket",
+	 "authkeypath" : "Optional - If trying to access ssh with pem key : pem key file path",
+	 "sourcebucket" : "File Source Bucket",
+  "filepath" : "File path",
+  "filedestinationfolder" :"Folder path where you want to copy the files at remote host"
+}
+
+```
