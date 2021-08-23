@@ -1,5 +1,5 @@
 # s3FilesCopier
-AWS lambda function to copy a file from s3 to remote server
+A simple AWS lambda function to copy a file from s3 bucket intto remote server.
 
 # Deployment
  - Download the deployment file from https://github.com/pratheeshpcplpta/s3FilesZipper

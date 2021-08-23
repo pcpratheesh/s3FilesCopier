@@ -1,6 +1,6 @@
 /**
  *
- * Author : <pratheesh@techversantinfo.com>
+ * Author : <pratheesh>
  *
  * AWS Lambda function
  *
@@ -19,6 +19,7 @@ import (
 	"os"
 
 	"github.com/pkg/sftp"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -49,9 +50,7 @@ var config Config
 // load configuration from env
 // configuration in format of base64 encode
 func parseConfig() (err error) {
-	data := make([]byte, 0)
-
-	data, err = base64.StdEncoding.DecodeString(os.Getenv("CONFIG"))
+	data, err := base64.StdEncoding.DecodeString(os.Getenv("CONFIG"))
 	if err != nil {
 		return err
 	}
@@ -69,13 +68,17 @@ func parseConfig() (err error) {
 // validate configs
 func validateConfig() error {
 	if config.Authkey == "" && config.AuthKeyBucket == "" && config.Password == "" {
-		return fmt.Errorf("Connection configuration not found")
+		return fmt.Errorf("connection configuration not found")
 	}
 	return nil
 }
 
 // Lambda execution callback
 func Handler(event interface{}) error {
+
+	// initiate logger
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
 
 	//load configuration
 	err := parseConfig()
@@ -86,18 +89,25 @@ func Handler(event interface{}) error {
 
 	//validate inputs
 	err = validateConfig()
-
+	if err != nil {
+		logger.Error("unable to validate configuration", zap.Error(err))
+		return err
+	}
 	e := event.(map[string]interface{})
 
 	if e == nil {
-		return fmt.Errorf("Unable to find payload")
+		logger.Error("unable to find payload", zap.Error(err))
+		return fmt.Errorf("unable to find payload")
 	}
 
 	//create session
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(config.Region)},
 	)
-
+	if err != nil {
+		logger.Error("unable initiate aws connection", zap.Error(err))
+		return err
+	}
 	// initialize
 	svc := s3.New(sess)
 
@@ -124,7 +134,8 @@ func Handler(event interface{}) error {
 
 		signer, err := ssh.ParsePrivateKey(pemBytes)
 		if err != nil {
-			log.Fatalf("parse key failed:%v", err)
+			logger.Error("parse key failed:%v", zap.Error(err))
+			return err
 		}
 
 		Authentications = append(Authentications, ssh.PublicKeys(signer))
@@ -146,7 +157,7 @@ func Handler(event interface{}) error {
 	}
 	defer conn.Close()
 
-	fmt.Println("connected to ssh")
+	logger.Info("connected to ssh")
 
 	// create new SFTP client
 	client, err := sftp.NewClient(conn)
@@ -169,7 +180,8 @@ func Handler(event interface{}) error {
 	})
 
 	if err != nil {
-		log.Fatalf("error creating source %v ", err)
+		logger.Error("error creating source %v ", zap.Error(err))
+		return err
 	}
 
 	buf := new(bytes.Buffer)
@@ -177,17 +189,13 @@ func Handler(event interface{}) error {
 
 	srcFile := buf
 
-	fmt.Println("read source file")
-
-	// // copy source file to destination file
-	// var buff []byte
-	// buff, err = json.Marshal(buf)
+	logger.Info("read source file")
 
 	bytes, err := io.Copy(dstFile, srcFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%d bytes copied\n", bytes, srcFile)
+	logger.Info("%d bytes copied\n", zap.Any("", bytes), zap.Any("", srcFile))
 
 	return nil
 }
